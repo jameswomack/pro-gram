@@ -1,0 +1,25 @@
+{
+  // Line length: warn at 136 chars, heading max 80
+  "MD013": {
+    "line_length": 136,
+    "heading_line_length": 80,
+    "code_blocks": false,
+    "tables": false
+  },
+  // Allow multiple top-level headings per file
+  "MD025": false,
+  // Allow duplicate sibling headings
+  "MD024": { "siblings_only": true },
+  // Ordered list prefix: not enforced
+  "MD029": false,
+  // Fenced code blocks must have language specified
+  "MD040": true,
+  // Don't use emphasis as heading
+  "MD036": true,
+  // Files must end with newline
+  "MD047": true,
+  // No trailing spaces
+  "MD009": true,
+  // No hard tabs
+  "MD010": true
+}

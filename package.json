@@ -1,0 +1,27 @@
+{
+  "name": "@jameswomack/pro-gram",
+  "version": "1.0.0-alpha.0",
+  "private": true,
+  "description": "Homebase for cutting-edge programming environment and techniques",
+  "repository": "https://github.com/jameswomack/pro-gram",
+  "author": "James Womack",
+  "license": "MIT",
+  "scripts": {
+    "dev": "pnpm --filter '@jameswomack/*' --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r exec rm -rf dist .next out node_modules/.cache"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=24.16.0",
+    "pnpm": ">=9.7.0"
+  },
+  "packageManager": "pnpm@9.7.0"
+}
