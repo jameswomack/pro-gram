@@ -54,12 +54,13 @@ pro-gram/
 
 | ID | Feature | Status | Key Files | Notes |
 |----|---------|--------|-----------|-------|
-| F-001 | MLX runtime integration (mluxe) | `[PARTIAL]` | `packages/mluxe/src/index.ts` | MluxeClient wraps mlx_lm.server with OpenAI-compatible API. Server/CLI/fine-tune modes. |
+| F-001 | MLX runtime integration (mluxe) | `[SHIPPED]` | `packages/mluxe/src/` | All three modes: `MluxeClient` (server: chat / chatStream / complete / listModels / lifecycle), `generate()` (CLI batch), `trainLora()`+`fuseLora()` (fine-tune). 11 unit tests. |
 | F-002 | API server skeleton | `[SHIPPED]` | `apps/api/src/index.ts` | Fastify 5, health endpoint, Zod validation ready |
 | F-003 | Web app skeleton | `[SHIPPED]` | `apps/web/` | Next.js 16, React 19, Turbopack |
-| F-004 | CLI skeleton | `[SHIPPED]` | `apps/cli/src/index.ts` | tsx-based, ready for commands |
+| F-004 | CLI skeleton | `[SHIPPED]` | `apps/cli/src/` | Interactive TUI built on `@jameswomack/clitermus`. Commands follow noun×verb×modifier taxonomy (see `apps/cli/README.md`). Registered: `ml exec`, `ml chat`, `health api/web/all`, `spec status`. |
 | F-005 | AI context system (.ai/) | `[SHIPPED]` | `.ai/` | SPEC.md, skills, tool-configs, multi-agent symlinks |
 | F-006 | Monorepo infrastructure | `[SHIPPED]` | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json` | pnpm workspaces, shared TS config, Prettier, EditorConfig |
+| F-007 | CLI+TUI primitives package (clitermus) | `[SHIPPED]` | `packages/clitermus/src/` | `levenshtein` / `damerauLevenshtein` / `CommandPalette` / `History` / `createTui`. Blessed-backed TUI with ghost-text autocomplete, prefix-filtered history, did-you-mean. 16 unit tests. Will publish as `@jameswomack/clitermus`. |
 
 ### 2.2 Planned
 
