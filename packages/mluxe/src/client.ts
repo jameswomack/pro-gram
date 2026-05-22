@@ -10,7 +10,8 @@ import type {
   MluxeConfig,
 } from './types.js';
 
-type ResolvedConfig = Required<Omit<MluxeConfig, 'onLog'>> & Pick<MluxeConfig, 'onLog'>;
+type ResolvedConfig = Required<Omit<MluxeConfig, 'onLog' | 'promptCacheBytes' | 'draftModel'>> &
+  Pick<MluxeConfig, 'onLog' | 'promptCacheBytes' | 'draftModel'>;
 
 /** Ask the OS for an unused TCP port on `host`. */
 async function findFreePort(host: string): Promise<number> {
@@ -72,6 +73,11 @@ export class MluxeClient {
       host: config.host ?? '127.0.0.1',
       python: config.python ?? 'python',
       onLog: config.onLog,
+      promptCacheSize: config.promptCacheSize ?? 4,
+      promptCacheBytes: config.promptCacheBytes,
+      draftModel: config.draftModel,
+      numDraftTokens: config.numDraftTokens ?? 4,
+      warmup: config.warmup ?? false,
     };
     this.activePort = this.config.port;
   }
@@ -123,16 +129,24 @@ export class MluxeClient {
       this.activePort = free;
     }
 
-    const proc = spawn(
-      this.config.python,
-      [
-        '-m', 'mlx_lm.server',
-        '--model', this.config.model,
-        '--port', String(this.activePort),
-        '--host', this.config.host,
-      ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
-    );
+    const args = [
+      '-m', 'mlx_lm.server',
+      '--model', this.config.model,
+      '--port', String(this.activePort),
+      '--host', this.config.host,
+    ];
+    if (this.config.promptCacheSize > 0) {
+      args.push('--prompt-cache-size', String(this.config.promptCacheSize));
+    }
+    if (this.config.promptCacheBytes) {
+      args.push('--prompt-cache-bytes', this.config.promptCacheBytes);
+    }
+    if (this.config.draftModel) {
+      args.push('--draft-model', this.config.draftModel);
+      args.push('--num-draft-tokens', String(this.config.numDraftTokens));
+    }
+    this.config.onLog?.(`[mluxe] spawn args: ${args.slice(1).join(' ')}`, 'stdout');
+    const proc = spawn(this.config.python, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.serverProcess = proc;
 
     // ALWAYS drain stdout/stderr — if we don't, the OS pipe buffer fills
@@ -152,6 +166,20 @@ export class MluxeClient {
     } catch (err) {
       await this.stopServer();
       throw err;
+    }
+
+    if (this.config.warmup) {
+      // Trigger graph compilation + KV-cache allocation with a 1-token request
+      // so the user's first real turn doesn't pay that latency.
+      try {
+        await this.chat([{ role: 'user', content: '.' }], { max_tokens: 1 });
+        this.config.onLog?.(`[mluxe] warmup complete`, 'stdout');
+      } catch (err) {
+        this.config.onLog?.(
+          `[mluxe] warmup failed (continuing): ${err instanceof Error ? err.message : String(err)}`,
+          'stderr',
+        );
+      }
     }
   }
 
