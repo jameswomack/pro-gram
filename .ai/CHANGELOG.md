@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-05-22 (perf round)
+
+- F-008: `/ml chat` perf tuning. `MluxeClient` now accepts `promptCacheSize` (default 4), `promptCacheBytes`, `draftModel`, `numDraftTokens` (default 4), and `warmup` — all forwarded to `mlx_lm.server` flags or executed post-startup. `/ml chat` exposes these as `--draft=<id|alias>`, `--cache-size=N`, `--cache-bytes=4G`, `--no-warmup`. New aliases: `qwen-14b`/`qwen-7b`/`qwen-3b`/`qwen-1.5b`/`qwen-0.5b` resolve to full HF ids. The chat loop now streams each delta to the activity bar (tail-truncated) so the user watches tokens land instead of waiting for the full response, and prints `ttft` + `total` ms after each turn. The server cache key includes the draft+cache params so changing them respawns cleanly. `MLUXE_MODEL` and new `MLUXE_DRAFT_MODEL` env vars override defaults.
+
 ### 2026-05-22
 
 - mluxe `MluxeClient`: ring-buffer last 80 stdout/stderr lines from the spawned mlx_lm.server, capture `lastExit = {code, signal}` on death, and expose `getDiagnostics()`. Critically, **always** drain stdout/stderr (previously only drained when `onLog` was set) — a non-drained pipe fills the ~64KB kernel buffer and blocks the child on write, which presents as the server "freezing" mid-stream.

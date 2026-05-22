@@ -17,6 +17,36 @@ pnpm --filter @jameswomack/cli dev    # Watch mode
 pnpm --filter @jameswomack/cli test   # Run tests
 ```
 
+> **First-run note.** Workspace packages (`@jameswomack/clitermus`, `@jameswomack/mluxe`)
+> compile to `dist/` which is **not** in git. After a fresh checkout or `pnpm install`,
+> run `pnpm -r build` once before `pnpm --filter @jameswomack/cli start` — otherwise
+> tsx will fail with `Cannot find module '.../dist/index.js'`.
+
+## `/ml` flags & aliases
+
+`/ml exec "prompt" [--model=…] [--max-tokens=N] [--format=text|json]`
+
+`/ml chat [opening] [--model=…] [--draft=…] [--cache-size=N] [--cache-bytes=4G] [--no-warmup]`
+
+Model alias shortcuts (resolve to `mlx-community/*-Instruct-4bit`):
+
+| Alias       | Repo                                              | Size  | Use                              |
+|-------------|---------------------------------------------------|-------|----------------------------------|
+| `qwen-14b`  | `mlx-community/Qwen2.5-14B-Instruct-4bit`         | ~8 GB | Default. Best quality.           |
+| `qwen-7b`   | `mlx-community/Qwen2.5-7B-Instruct-4bit`          | ~4 GB | ~2× faster, modest quality drop. |
+| `qwen-3b`   | `mlx-community/Qwen2.5-3B-Instruct-4bit`          | ~2 GB | ~4× faster, casual chat.         |
+| `qwen-1.5b` | `mlx-community/Qwen2.5-1.5B-Instruct-4bit`        | ~1 GB | Very fast, smart-enough.         |
+| `qwen-0.5b` | `mlx-community/Qwen2.5-0.5B-Instruct-4bit`        | ~0.3 GB | Best as a `--draft` partner.   |
+
+Performance tips (default config already turns these on where free):
+
+- **Prompt cache** is on by default (4 slots). Multi-turn chats see ~2–5× lower latency on turn 2+.
+- **Warm-up shot** is on by default. Costs a few seconds at startup; eliminates compile latency on the user's first real turn.
+- **Speculative decoding** is opt-in. `--draft=qwen-0.5b` with the 14B main usually nets ~1.5–2× throughput at no quality cost.
+- **Smaller model**: `--model=qwen-7b` is the easiest big lever.
+
+Environment overrides: `MLUXE_MODEL`, `MLUXE_DRAFT_MODEL`, `MLUXE_PYTHON`.
+
 ---
 
 ## Taxonomy & Naming Philosophy

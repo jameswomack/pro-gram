@@ -2,17 +2,41 @@ import type { CommandContext } from '@jameswomack/clitermus';
 import { generate, MluxeClient, type ChatMessage } from '@jameswomack/mluxe';
 import { ensureModelDownloaded } from '../lib/ensure-model.js';
 
-const DEFAULT_MODEL = process.env.MLUXE_MODEL ?? 'mlx-community/Qwen2.5-14B-Instruct-4bit';
+/**
+ * Friendly aliases that expand to full HF repo ids. Lets users say
+ * `--model=qwen-7b` instead of `--model=mlx-community/Qwen2.5-7B-Instruct-4bit`.
+ *
+ * Smaller models trade quality for speed; 0.5B is the canonical draft-model
+ * partner for speculative decoding against the 14B main.
+ */
+export const MODEL_ALIASES: Readonly<Record<string, string>> = {
+  'qwen-14b': 'mlx-community/Qwen2.5-14B-Instruct-4bit',
+  'qwen-7b': 'mlx-community/Qwen2.5-7B-Instruct-4bit',
+  'qwen-3b': 'mlx-community/Qwen2.5-3B-Instruct-4bit',
+  'qwen-1.5b': 'mlx-community/Qwen2.5-1.5B-Instruct-4bit',
+  'qwen-0.5b': 'mlx-community/Qwen2.5-0.5B-Instruct-4bit',
+};
+
+const DEFAULT_MODEL = resolveModelAlias(process.env.MLUXE_MODEL ?? 'qwen-14b');
+const DEFAULT_DRAFT_MODEL =
+  process.env.MLUXE_DRAFT_MODEL !== undefined
+    ? resolveModelAlias(process.env.MLUXE_DRAFT_MODEL) || undefined
+    : undefined;
+
+function resolveModelAlias(idOrAlias: string): string {
+  return MODEL_ALIASES[idOrAlias.toLowerCase()] ?? idOrAlias;
+}
 
 /**
- * /ml exec "prompt" [--model=<id>] [--max-tokens=N] [--format=text|json]
+ * /ml exec "prompt" [--model=<id|alias>] [--max-tokens=N] [--format=text|json]
  *
  * Shells out to mlx_lm.generate (no server needed). Best for one-shot use.
  */
 export async function mlExec(ctx: CommandContext): Promise<void> {
   const { prompt, model, maxTokens, format } = parseFlags(ctx.args);
   if (!prompt) {
-    ctx.log('{red-fg}Usage: /ml exec "your prompt" [--model=<id>] [--max-tokens=N] [--format=text|json]{/red-fg}');
+    ctx.log('{red-fg}Usage: /ml exec "your prompt" [--model=<id|alias>] [--max-tokens=N] [--format=text|json]{/red-fg}');
+    ctx.log(`{gray-fg}Aliases: ${Object.keys(MODEL_ALIASES).join(', ')}{/gray-fg}`);
     return;
   }
   const ready = await ensureModelDownloaded(ctx, model);
@@ -35,55 +59,79 @@ export async function mlExec(ctx: CommandContext): Promise<void> {
 }
 
 /**
- * /ml chat [opening prompt] [--model=<id>]
+ * /ml chat [opening prompt]
+ *   [--model=<id|alias>]
+ *   [--draft=<id|alias>]              speculative decoding partner
+ *   [--cache-size=N] [--cache-bytes=4G]
+ *   [--no-warmup]
  *
- * Enters an interactive multi-turn chat: every line you type is sent as the
- * next user message; the model's reply is streamed back; the conversation
- * history is preserved across turns.
+ * Multi-turn chat. The mlx_lm.server keeps a prompt cache so follow-up turns
+ * skip prefill (~2–5× lower latency on turn 2+). With `--draft`, a small model
+ * proposes tokens for the main one to verify in parallel (~1.5–2× faster output).
  *
- * Exit by pressing Escape or typing `/exit` (or `quit`, `bye`, or just `/`).
- * The mlx_lm.server process is cached across sessions of the same model.
+ * Exit with Escape or `/exit`. The server is cached across chat sessions for
+ * the same model+draft combo.
  */
 let cachedClient: MluxeClient | null = null;
-let cachedClientModel: string | null = null;
+let cachedClientKey: string | null = null;
 
 /** Called from process exit handlers — best-effort shutdown of the cached mlx server. */
 export function shutdownMlClients(): void {
   if (!cachedClient) return;
-  // Synchronous SIGTERM via the underlying child; stopServer() is async and exit
-  // won't await it, but the signal is enough for mlx_lm.server to release :8080.
   void cachedClient.stopServer();
   cachedClient = null;
-  cachedClientModel = null;
+  cachedClientKey = null;
+}
+
+/**
+ * Truncate-from-the-left so the live-stream activity bar always shows the most
+ * recent text. Strips newlines so the single-row activity widget stays one row.
+ */
+function tailForActivity(s: string, max = 90): string {
+  const flat = s.replace(/\s+/g, ' ');
+  if (flat.length <= max) return flat;
+  return '…' + flat.slice(flat.length - max + 1);
 }
 
 export async function mlChat(ctx: CommandContext): Promise<void> {
-  const { prompt: opening, model } = parseFlags(ctx.args);
+  const { prompt: opening, model, draftModel, cacheSize, cacheBytes, warmup } = parseFlags(ctx.args);
 
   const ready = await ensureModelDownloaded(ctx, model);
   if (!ready) return;
+  if (draftModel) {
+    const draftReady = await ensureModelDownloaded(ctx, draftModel);
+    if (!draftReady) return;
+  }
 
-  if (!cachedClient || cachedClientModel !== model) {
+  const cacheKey = `${model}|${draftModel ?? ''}|${cacheSize}|${cacheBytes ?? ''}`;
+  if (!cachedClient || cachedClientKey !== cacheKey) {
     if (cachedClient) await cachedClient.stopServer();
     cachedClient = new MluxeClient({
       model,
+      draftModel,
+      numDraftTokens: 4,
+      promptCacheSize: cacheSize,
+      promptCacheBytes: cacheBytes,
+      warmup,
       onLog: (line, stream) => {
-        // Surface anything that looks like a real problem.
-        // mlx_lm logs INFO lines via the stdlib logger ("YYYY-MM-DD … - INFO - …")
-        // — filter those out so we don't drown the chat in access logs.
         if (/^\d{4}-\d{2}-\d{2}.*- INFO -/.test(line)) return;
         if (/^\d{4}-\d{2}-\d{2}.*- DEBUG -/.test(line)) return;
-        if (/^127\.0\.0\.1.*"(GET|POST)/.test(line)) return; // http access log
-        if (/^Fetching \d+ files/.test(line)) return; // hf hub progress noise
+        if (/^127\.0\.0\.1.*"(GET|POST)/.test(line)) return;
+        if (/^Fetching \d+ files/.test(line)) return;
         const color = stream === 'stderr' ? 'red-fg' : 'gray-fg';
         ctx.log(`{${color}}[mlx] ${line}{/${color}}`);
       },
     });
-    cachedClientModel = model;
-    ctx.log(`{gray-fg}Starting mlx_lm.server (model=${model})…{/gray-fg}`);
-    ctx.progress(` {cyan-fg}⟳{/cyan-fg} {bold}Booting MLX server…{/bold} {gray-fg}(this can take 30–60s on first launch){/gray-fg}`);
+    cachedClientKey = cacheKey;
+    const knobs: string[] = [`model=${model}`];
+    if (draftModel) knobs.push(`draft=${draftModel}`);
+    if (cacheSize) knobs.push(`cache=${cacheSize}`);
+    if (cacheBytes) knobs.push(`cache-bytes=${cacheBytes}`);
+    if (warmup) knobs.push('warmup');
+    ctx.log(`{gray-fg}Starting mlx_lm.server (${knobs.join(' · ')})…{/gray-fg}`);
+    ctx.progress(` {cyan-fg}⟳{/cyan-fg} {bold}Booting MLX server…{/bold} {gray-fg}(30–60s on first launch; warmup adds a few s){/gray-fg}`);
     try {
-      await cachedClient.startServer(180_000);
+      await cachedClient.startServer(240_000);
     } finally {
       ctx.progress(null);
     }
@@ -94,14 +142,12 @@ export async function mlChat(ctx: CommandContext): Promise<void> {
   const messages: ChatMessage[] = [];
 
   ctx.log('');
-  ctx.log(`{bold}─── chat with ${model} ───{/bold}`);
+  ctx.log(`{bold}─── chat with ${model}${draftModel ? ` (+draft ${draftModel})` : ''} ───{/bold}`);
   ctx.log('{gray-fg}Type a message and press Enter. Escape or "/exit" leaves the chat.{/gray-fg}');
   ctx.log('');
 
   let firstTurn = opening || null;
 
-  // Turn loop
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     let userText: string | null;
     if (firstTurn) {
@@ -125,11 +171,17 @@ export async function mlChat(ctx: CommandContext): Promise<void> {
     messages.push({ role: 'user', content: trimmed });
 
     let assistantText = '';
+    let firstTokenAt = 0;
+    const t0 = Date.now();
     ctx.progress(` {cyan-fg}…{/cyan-fg} {bold}thinking…{/bold}`);
     try {
       for await (const chunk of client.chatStream(messages)) {
         if (chunk.done) break;
+        if (!firstTokenAt && chunk.delta) firstTokenAt = Date.now();
         assistantText += chunk.delta;
+        // Live-render the trailing edge to the activity bar so the user sees
+        // tokens land instead of staring at "thinking…" until completion.
+        ctx.progress(` {cyan-fg}mlx ›{/cyan-fg} ${tailForActivity(assistantText)}`);
       }
     } catch (err) {
       ctx.progress(null);
@@ -146,21 +198,23 @@ export async function mlChat(ctx: CommandContext): Promise<void> {
           ctx.log(`{gray-fg}  ${line}{/gray-fg}`);
         }
       }
-      ctx.log(`{gray-fg}  Hint: type /exit to leave, then retry /ml chat — the client will pick a fresh port.{/gray-fg}`);
+      ctx.log(`{gray-fg}  Hint: /exit and re-enter /ml chat — the client will respawn.{/gray-fg}`);
       messages.pop();
-      // Server died — clear the cache so next /ml chat respawns instead of reusing a dead client
       if (!diag.isRunning && cachedClient === client) {
         cachedClient = null;
-        cachedClientModel = null;
+        cachedClientKey = null;
       }
-      if (!diag.isRunning) return; // bail out of the loop; user can re-enter chat fresh
+      if (!diag.isRunning) return;
       continue;
     }
     ctx.progress(null);
 
+    const totalMs = Date.now() - t0;
+    const ttftMs = firstTokenAt ? firstTokenAt - t0 : 0;
     messages.push({ role: 'assistant', content: assistantText });
     ctx.log(`{cyan-fg}mlx ›{/cyan-fg}`);
     for (const line of assistantText.split('\n')) ctx.log(`  ${line}`);
+    ctx.log(`{gray-fg}  (ttft ${ttftMs} ms · total ${totalMs} ms){/gray-fg}`);
     ctx.log('');
   }
 }
@@ -170,23 +224,35 @@ interface ParsedFlags {
   model: string;
   maxTokens: number;
   format: 'text' | 'json';
+  draftModel: string | undefined;
+  cacheSize: number;
+  cacheBytes: string | undefined;
+  warmup: boolean;
 }
 
 function parseFlags(args: string[]): ParsedFlags {
   let model = DEFAULT_MODEL;
   let maxTokens = 512;
   let format: 'text' | 'json' = 'text';
+  let draftModel: string | undefined = DEFAULT_DRAFT_MODEL;
+  let cacheSize = 4;
+  let cacheBytes: string | undefined;
+  let warmup = true;
   const positional: string[] = [];
 
   for (const a of args) {
-    if (a.startsWith('--model=')) model = a.slice(8);
+    if (a.startsWith('--model=')) model = resolveModelAlias(a.slice(8));
     else if (a.startsWith('--max-tokens=')) maxTokens = Number(a.slice(13)) || maxTokens;
     else if (a.startsWith('--format=')) {
       const f = a.slice(9);
       if (f === 'json' || f === 'text') format = f;
-    } else {
-      positional.push(a);
-    }
+    } else if (a.startsWith('--draft=')) draftModel = resolveModelAlias(a.slice(8));
+    else if (a === '--no-draft') draftModel = undefined;
+    else if (a.startsWith('--cache-size=')) cacheSize = Number(a.slice(13)) || cacheSize;
+    else if (a.startsWith('--cache-bytes=')) cacheBytes = a.slice(14);
+    else if (a === '--no-warmup') warmup = false;
+    else if (a === '--warmup') warmup = true;
+    else positional.push(a);
   }
-  return { prompt: positional.join(' '), model, maxTokens, format };
+  return { prompt: positional.join(' '), model, maxTokens, format, draftModel, cacheSize, cacheBytes, warmup };
 }
