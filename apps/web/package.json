@@ -4,9 +4,9 @@
   "private": true,
   "description": "Next.js frontend for pro-gram",
   "scripts": {
-    "dev": "next dev --turbopack -p ${PORT:-3000}",
+    "dev": "next dev --turbopack -p ${PORT:-30000}",
     "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "next start -p ${PORT:-30000}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
