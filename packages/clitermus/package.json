@@ -1,0 +1,49 @@
+{
+  "name": "@jameswomack/clitermus",
+  "version": "0.1.0-alpha.0",
+  "description": "Reusable CLI + TUI primitives — text input area, output pane, Levenshtein autocomplete, persistent history, command dispatch.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./palette": {
+      "types": "./dist/palette.d.ts",
+      "import": "./dist/palette.js"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": ["cli", "tui", "blessed", "autocomplete", "levenshtein", "repl"],
+  "author": "James Womack",
+  "license": "MIT",
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.27",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=24.16.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

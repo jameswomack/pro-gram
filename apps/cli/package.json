@@ -26,6 +26,8 @@
     "pnpm": ">=9.7.0"
   },
   "dependencies": {
+    "@jameswomack/clitermus": "workspace:*",
+    "@jameswomack/mluxe": "workspace:*",
     "dotenv": "^17.4.2"
   }
 }
