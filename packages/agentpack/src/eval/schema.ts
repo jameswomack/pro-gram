@@ -31,6 +31,14 @@ const AssertionSchema = z.union([
       args: z.record(z.unknown()),
     }),
   }),
+  z.object({ widgetEmitted: z.string() }),
+  z.object({ widgetNotEmitted: z.string() }),
+  z.object({
+    widgetArgsContain: z.object({
+      widget: z.string(),
+      args: z.record(z.unknown()),
+    }),
+  }),
   z.object({ minAssistantTurns: z.number().int().positive() }),
 ]);
 

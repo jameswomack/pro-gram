@@ -57,4 +57,37 @@ describe('evaluateAssertion', () => {
     expect(evaluateAssertion({ minAssistantTurns: 2 }, sample).pass).toBe(true);
     expect(evaluateAssertion({ minAssistantTurns: 3 }, sample).pass).toBe(false);
   });
+
+  const widgetSample = traj([
+    { role: 'system', content: 'sys' },
+    { role: 'user', content: 'show me Witt' },
+    {
+      role: 'assistant',
+      content: '',
+      tool_calls: [{
+        id: 'w1',
+        type: 'function',
+        function: { name: 'widget__player_card', arguments: JSON.stringify({ player: 'Bobby Witt Jr.', wOBA: 0.350 }) },
+      }],
+    },
+    { role: 'tool', tool_call_id: 'w1', name: 'widget__player_card', content: '[widget player_card rendered] ...' },
+    { role: 'assistant', content: "Here's Witt — note the synthetic data flag." },
+  ]);
+
+  it('widgetEmitted / widgetNotEmitted', () => {
+    expect(evaluateAssertion({ widgetEmitted: 'player_card' }, widgetSample).pass).toBe(true);
+    expect(evaluateAssertion({ widgetEmitted: 'chart_summary' }, widgetSample).pass).toBe(false);
+    expect(evaluateAssertion({ widgetNotEmitted: 'chart_summary' }, widgetSample).pass).toBe(true);
+  });
+
+  it('widgetArgsContain matches subset', () => {
+    expect(evaluateAssertion(
+      { widgetArgsContain: { widget: 'player_card', args: { player: 'Bobby Witt' } } },
+      widgetSample,
+    ).pass).toBe(true);
+    expect(evaluateAssertion(
+      { widgetArgsContain: { widget: 'player_card', args: { player: 'Aaron Judge' } } },
+      widgetSample,
+    ).pass).toBe(false);
+  });
 });

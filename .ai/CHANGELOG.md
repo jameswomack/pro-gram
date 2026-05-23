@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-05-22 (F-009 Phase 3: widgets)
+
+- agentpack: new widget abstraction. `[[widget]]` entries in `pack.toml` declare UI affordances (id, description, JSON-Schema args file, JS renderer module). `WidgetRegistry` loads renderers via dynamic import and exposes widgets in OpenAI function-tool shape with name prefix `widget__<id>`. Widgets are forwarded to the model in the `tools` array alongside MCP tools; `PackRuntime` detects `widget__*` calls and routes them to the renderer instead of MCP, firing a new `onWidget(emission)` hook and returning a synthetic tool result so the model knows the widget rendered.
+- agentpack: deliberate deviation from "strictly MCP" — widgets aren't servers (no side effects beyond rendering), so forcing them through MCP would be ceremony without benefit. From the model's perspective they're indistinguishable from MCP tools; only the runtime sees the prefix and routes differently. Documented in `widgets.md`.
+- agentpack `eval/`: three new assertion forms — `widgetEmitted`, `widgetNotEmitted`, `widgetArgsContain` (loose subset match like `toolArgsContain`). `EvalRunner` constructor accepts an optional `WidgetRegistry` so eval suites can exercise widget emission end-to-end.
+- apps/cli `/pack run`: loads `WidgetRegistry` next to `McpRegistry`, renders `onWidget` emissions as Unicode-box panels. `/pack info` shows declared widget ids. `/pack eval` passes the registry through to the runner so widget assertions actually fire.
+- Two example widgets shipped with corresponding eval cases:
+  - `baseball-stats.player_card` — ASCII player stat card (wOBA/xwOBA/wRC+/barrel rate, with a `synthetic` warning surface).
+  - `astrologer.chart_summary` — celestial snapshot card (sun/moon/rising/day-ruler/headline-transit, with `synthetic` warning).
+- System prompts updated to describe widget tools and when to call them (e.g., baseball-stats tells the model to emit `player_card` *after* a `stats__lookup_player` call and propagate the `synthetic` flag).
+- Tests: 21 agentpack unit tests (assertions × 9 now, judge × 5, diff × 2, manifest × 3, pack × 2). New widget tests cover emit/not-emit detection and subset arg matching.
+- Docs: new `packages/agentpack/docs/widgets.md` (full reference + authoring tips + the MCP-deviation rationale); `architecture.md` Phase 3 → SHIPPED with widget docs cross-linked. SPEC F-009 key-files cell expanded.
+
 ### 2026-05-22 (F-009 Phase 2: agent-pack evals)
 
 - agentpack `eval/`: full evaluation runner with three tiers. **Tier 1** (`cases.yaml`) — single-turn input + structural assertions (`contains`, `notContains`, `finalContains`, `finalNotContains`, `regex`, `toolCalled`, `toolNotCalled`, `toolArgsContain`, `minAssistantTurns`); no judge. **Tier 2** (`properties.yaml`) — single-turn input + LLM-as-judge against a rubric, G-Eval style (CoT reasoning before score, leniently parsed JSON). **Tier 3** (`tasks.yaml`) — multi-turn scripted conversation + judge over full trajectory. Per-case `maxTokens` override; per-case `threshold` for judge tiers.

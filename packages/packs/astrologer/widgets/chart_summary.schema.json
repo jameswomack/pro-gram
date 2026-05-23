@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "subject":      { "type": "string", "description": "Whose chart (or the moment in time)." },
+    "sun":          { "type": "string", "description": "Sun sign." },
+    "moon":         { "type": "string", "description": "Moon sign." },
+    "rising":       { "type": "string", "description": "Rising / ascendant sign." },
+    "planetDay":    { "type": "string", "description": "Classical planetary ruler of the day." },
+    "currentMoon":  { "type": "string", "description": "Current moon sign (if rendering 'now')." },
+    "headlineTransit": { "type": "string", "description": "One-line transit worth flagging." },
+    "synthetic":    { "type": "boolean", "description": "Flag this chart as illustrative / not from an ephemeris." }
+  }
+}

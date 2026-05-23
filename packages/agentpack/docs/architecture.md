@@ -129,15 +129,32 @@ A pack model client (with the pack's preferred model + draft) and a judge
 client (separate model, pinned to port 8090 so both stay up) are cached
 across `/pack eval` invocations in a session. Shutdown hook closes both.
 
-## Phase 3 — Widgets (planned)
+## Phase 3 — Widgets (shipped)
 
-Each pack can declare `[[widget]]` entries: a JSON schema for the data shape
-and a reference to a React component in `apps/web`. The model emits a
-structured `<widget …>` tag (or JSON blob); the web app renders. CLI shows a
-collapsed text representation.
+Full reference: [`widgets.md`](widgets.md).
 
-Eval extension: score whether the right widget was emitted for the right
-query.
+Widgets are UI affordances the pack declares; the model "calls" them like
+tools, but the runtime intercepts widget tool calls (name prefix
+`widget__`), runs the pack-supplied renderer, fires `onWidget` for the
+client to render, and returns a synthetic tool result so the model can keep
+talking about the widget it just emitted. Declared via `[[widget]]` in
+`pack.toml` with a JSON-Schema args file and a JS renderer module
+(default-exports `renderText(args): string`).
+
+Rendering is per-client: the CLI wraps the renderer's text in a
+Unicode-box panel; a future web client will import the same module and
+read a `Component` export (additive — no manifest change required).
+
+Eval extension: three new `cases.yaml` assertions — `widgetEmitted`,
+`widgetNotEmitted`, `widgetArgsContain` (mirrors `toolArgsContain` with
+subset-match semantics). Both example packs ship one widget +
+corresponding eval case.
+
+Deliberate non-MCP deviation: widgets aren't MCP servers — they're
+declarative emissions with no side effects, so MCP would be ceremony
+without benefit. From the model's perspective they're indistinguishable
+from MCP tools (same `tools[]` shape, same call protocol); only the
+runtime sees the prefix and routes differently.
 
 ## Phase 4 — The novel stuff
 

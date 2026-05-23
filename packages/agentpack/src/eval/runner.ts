@@ -5,6 +5,7 @@ import type { ChatMessage, MluxeClient } from '@jameswomack/mluxe';
 import { McpRegistry } from '../mcp.js';
 import { PackRuntime } from '../runtime.js';
 import type { LoadedPack } from '../pack.js';
+import type { WidgetRegistry } from '../widgets.js';
 import { evaluateAssertion, type AssertionResult } from './assertions.js';
 import { runJudge } from './judge.js';
 import {
@@ -75,12 +76,13 @@ async function runScripted(
   client: MluxeClient,
   userTurns: string[],
   perCaseMaxTokens: number,
+  widgets?: WidgetRegistry,
 ): Promise<{ trajectory: ChatMessage[]; durationMs: number; error?: string }> {
   const queue = [...userTurns];
   const trajectory: ChatMessage[] = [];
   // Temporarily override the pack's maxTokens for this case so tier 1 cases stay cheap.
   const scoped: LoadedPack = { ...pack, model: { ...pack.model, maxTokens: perCaseMaxTokens } };
-  const runtime = new PackRuntime(scoped, mcp, client);
+  const runtime = new PackRuntime(scoped, mcp, client, widgets);
   let error: string | undefined;
   const start = Date.now();
   await runtime.run(
@@ -98,6 +100,7 @@ export class EvalRunner {
     private pack: LoadedPack,
     private mcp: McpRegistry,
     private client: MluxeClient,
+    private widgets?: WidgetRegistry,
   ) {}
 
   /**
@@ -182,7 +185,7 @@ export class EvalRunner {
 
   private async runUnitCase(c: UnitCase): Promise<CaseResult> {
     const start = Date.now();
-    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, [c.input], c.maxTokens);
+    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, [c.input], c.maxTokens, this.widgets);
     if (error) {
       return baseResult('unit', c.id, 0, false, Date.now() - start, trajectory, error);
     }
@@ -194,7 +197,7 @@ export class EvalRunner {
 
   private async runPropertyCase(c: PropertyCase, judge: MluxeClient): Promise<CaseResult> {
     const start = Date.now();
-    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, [c.input], c.maxTokens);
+    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, [c.input], c.maxTokens, this.widgets);
     if (error) {
       return baseResult('property', c.id, 0, false, Date.now() - start, trajectory, error);
     }
@@ -209,7 +212,7 @@ export class EvalRunner {
   private async runTaskCase(c: TaskCase, judge: MluxeClient): Promise<CaseResult> {
     const start = Date.now();
     const turns = c.steps.map((s) => s.user);
-    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, turns, c.maxTokens);
+    const { trajectory, error } = await runScripted(this.pack, this.mcp, this.client, turns, c.maxTokens, this.widgets);
     if (error) {
       return baseResult('task', c.id, 0, false, Date.now() - start, trajectory, error);
     }
