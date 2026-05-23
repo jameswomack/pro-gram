@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-05-22 (stream render fix)
+
+- clitermus: new `ctx.streamLines()` → `LiveRegion { write, finalize }`. Opens a "live region" in the log pane backed by `box.setLine()` / `box.pushLine()` so streaming content grows lines naturally (blessed handles soft-wrap) instead of being crammed into the one-row activity bar. Static log content above and below is untouched.
+- apps/cli `/ml chat`: switched the streaming render from `ctx.progress()` (one-row activity bar, tail-truncated, unreadable for multi-line replies) to `ctx.streamLines()`. The `mlx ›` header is pushed once, then the body grows in place as tokens arrive. Spinner clears on first token. Timing footer `(ttft … · total …)` is printed after the live region finalizes.
+
 ### 2026-05-22 (perf round)
 
 - F-008: `/ml chat` perf tuning. `MluxeClient` now accepts `promptCacheSize` (default 4), `promptCacheBytes`, `draftModel`, `numDraftTokens` (default 4), and `warmup` — all forwarded to `mlx_lm.server` flags or executed post-startup. `/ml chat` exposes these as `--draft=<id|alias>`, `--cache-size=N`, `--cache-bytes=4G`, `--no-warmup`. New aliases: `qwen-14b`/`qwen-7b`/`qwen-3b`/`qwen-1.5b`/`qwen-0.5b` resolve to full HF ids. The chat loop now streams each delta to the activity bar (tail-truncated) so the user watches tokens land instead of waiting for the full response, and prints `ttft` + `total` ms after each turn. The server cache key includes the draft+cache params so changing them respawns cleanly. `MLUXE_MODEL` and new `MLUXE_DRAFT_MODEL` env vars override defaults.

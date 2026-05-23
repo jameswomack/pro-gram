@@ -83,16 +83,6 @@ export function shutdownMlClients(): void {
   cachedClientKey = null;
 }
 
-/**
- * Truncate-from-the-left so the live-stream activity bar always shows the most
- * recent text. Strips newlines so the single-row activity widget stays one row.
- */
-function tailForActivity(s: string, max = 90): string {
-  const flat = s.replace(/\s+/g, ' ');
-  if (flat.length <= max) return flat;
-  return '…' + flat.slice(flat.length - max + 1);
-}
-
 export async function mlChat(ctx: CommandContext): Promise<void> {
   const { prompt: opening, model, draftModel, cacheSize, cacheBytes, warmup } = parseFlags(ctx.args);
 
@@ -174,16 +164,24 @@ export async function mlChat(ctx: CommandContext): Promise<void> {
     let firstTokenAt = 0;
     const t0 = Date.now();
     ctx.progress(` {cyan-fg}…{/cyan-fg} {bold}thinking…{/bold}`);
+    // Header for the assistant turn — pushed once, stays put.
+    ctx.log(`{cyan-fg}mlx ›{/cyan-fg}`);
+    // Body grows in place via a live region; blessed handles soft-wrap.
+    const region = ctx.streamLines();
     try {
       for await (const chunk of client.chatStream(messages)) {
         if (chunk.done) break;
-        if (!firstTokenAt && chunk.delta) firstTokenAt = Date.now();
+        if (!firstTokenAt && chunk.delta) {
+          firstTokenAt = Date.now();
+          ctx.progress(null);
+        }
         assistantText += chunk.delta;
-        // Live-render the trailing edge to the activity bar so the user sees
-        // tokens land instead of staring at "thinking…" until completion.
-        ctx.progress(` {cyan-fg}mlx ›{/cyan-fg} ${tailForActivity(assistantText)}`);
+        const indented = assistantText.split('\n').map((l) => `  ${l}`).join('\n');
+        region.write(indented);
       }
+      region.finalize();
     } catch (err) {
+      region.finalize();
       ctx.progress(null);
       const msg = err instanceof Error ? err.message : String(err);
       const cause = err instanceof Error && err.cause ? ` (cause: ${(err.cause as Error).message ?? String(err.cause)})` : '';
@@ -212,8 +210,8 @@ export async function mlChat(ctx: CommandContext): Promise<void> {
     const totalMs = Date.now() - t0;
     const ttftMs = firstTokenAt ? firstTokenAt - t0 : 0;
     messages.push({ role: 'assistant', content: assistantText });
-    ctx.log(`{cyan-fg}mlx ›{/cyan-fg}`);
-    for (const line of assistantText.split('\n')) ctx.log(`  ${line}`);
+    // Body already lives in the log via the streamLines region. Just append
+    // the timing footer below it.
     ctx.log(`{gray-fg}  (ttft ${ttftMs} ms · total ${totalMs} ms){/gray-fg}`);
     ctx.log('');
   }
