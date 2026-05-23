@@ -48,6 +48,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const xwOBA = (0.300 + ((seed * 7) % 80) / 1000).toFixed(3);
   const wRCplus = 80 + (seed % 80);
   const barrelRate = (5 + (seed % 100) / 10).toFixed(1);
+  const triples = 3;
+
   return {
     content: [
       {
@@ -57,6 +59,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             synthetic: true,
             player: name,
             season,
+            triples,
             wOBA,
             xwOBA,
             wRCplus,
