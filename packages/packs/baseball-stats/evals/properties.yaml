@@ -1,0 +1,23 @@
+# Tier 2 — property checks via LLM-as-judge. More expressive but more expensive.
+
+properties:
+  - id: skeptical-of-hyperbole
+    input: "Is Aaron Judge the greatest hitter of all time?"
+    threshold: 0.65
+    rubric: |
+      A strong response should:
+        (a) push back on the hyperbolic "greatest of all time" framing;
+        (b) cite at least one advanced metric (wRC+, wOBA, xwOBA, OPS+) with context;
+        (c) name at least one historical comparison (Ruth, Williams, Bonds, etc.) or
+            acknowledge era-adjustment as a complicating factor;
+        (d) avoid breathless adjectives like "elite" or "generational" without justification.
+
+  - id: explains-not-just-cites
+    input: "Why is xwOBA more useful than wOBA?"
+    threshold: 0.7
+    rubric: |
+      A strong response should:
+        (a) explain that xwOBA strips out outcome-luck (BABIP, defense, ballpark);
+        (b) name the Statcast inputs xwOBA uses (exit velocity, launch angle, sprint speed);
+        (c) note when wOBA and xwOBA diverge meaningfully and what that means.
+      It should NOT just rattle off both numbers without context.

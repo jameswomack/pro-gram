@@ -19,3 +19,4 @@ export {
   type PackRuntimeHooks,
   type PackRuntimeOptions,
 } from './runtime.js';
+export * from './eval/index.js';

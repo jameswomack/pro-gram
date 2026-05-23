@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-05-22 (F-009 Phase 2: agent-pack evals)
+
+- agentpack `eval/`: full evaluation runner with three tiers. **Tier 1** (`cases.yaml`) — single-turn input + structural assertions (`contains`, `notContains`, `finalContains`, `finalNotContains`, `regex`, `toolCalled`, `toolNotCalled`, `toolArgsContain`, `minAssistantTurns`); no judge. **Tier 2** (`properties.yaml`) — single-turn input + LLM-as-judge against a rubric, G-Eval style (CoT reasoning before score, leniently parsed JSON). **Tier 3** (`tasks.yaml`) — multi-turn scripted conversation + judge over full trajectory. Per-case `maxTokens` override; per-case `threshold` for judge tiers.
+- agentpack `EvalRunner` drives `PackRuntime` non-interactively via the new `onMessage` hook (also added to runtime, fires on every message push) so the runner captures full trajectories. Pack-runtime maxTokens overridable per case.
+- agentpack `storage.ts`: JSONL writer/reader at `<pack>/.eval-runs/<iso>.jsonl` (one header record + one record per case; trajectory persisted in full). `listRuns()` returns runs newest-first. `.eval-runs/` is gitignored.
+- agentpack `diff.ts`: `diffRuns(prev, curr)` produces per-case status (`improved` / `regressed` / `unchanged` / `new` / `removed`) plus per-tier mean + pass-count deltas.
+- apps/cli `/pack eval <name> [--tier=1|2|3|all] [--diff] [--judge-model=qwen-3b]`: runs the suite, streams progress, prints per-case results with failed-assertion / judge-reasoning context, writes the JSONL, and optionally diffs against the prior run. Pack-model client and judge client cached separately (judge on port 8090) so both stay warm across invocations.
+- Example evals shipped for both packs: `baseball-stats` gets 5 tier-1 cases (advanced-metric usage, tool calls, synthetic-data disclosure, BABIP regression awareness, FIP-not-ERA) + 2 tier-2 properties (skeptical-of-hyperbole, explains-not-just-cites). `astrologer` gets 4 tier-1 cases (tool use, symbolic vs predictive, house vocabulary, evocative opener) + 2 tier-2 properties (holds-two-registers on Saturn return, refuses-deterministic-prediction).
+- Docs: new `packages/agentpack/docs/eval-schema.md` (full assertion + rubric reference, tips); `architecture.md` updated to mark Phase 2 shipped.
+- Tests: 19 agentpack unit tests (assertions × 7, judge JSON parse × 5, diff × 2, plus existing manifest × 3 + pack × 2).
+
 ### 2026-05-22 (F-009 Phase 1: agent packs)
 
 - New package `@jameswomack/agentpack`: a pack is a manifest (`pack.toml`) + composed system prompt + skills + MCP servers + model config. `loadPack()` parses + composes (handles `extends` inheritance, base→leaf prompt order, auto vs. on-demand skills). `McpRegistry` owns MCP client lifetimes — in-process servers via `@modelcontextprotocol/sdk` `InMemoryTransport`, external `stdio` servers as subprocesses; exposes tools in OpenAI function-call shape. `PackRuntime` drives the chat tool-loop with hooks for live streaming + tool-call rendering. 5 unit tests.

@@ -1,0 +1,28 @@
+# Tier 1 — unit cases.
+
+cases:
+  - id: uses-almanac-tool-for-now
+    input: "What's the celestial weather like right now? I want a vibe check."
+    maxTokens: 250
+    asserts:
+      - toolCalled: almanac__current_celestial_time
+
+  - id: distinguishes-symbolic-from-predictive
+    input: "Will I get the job I interviewed for?"
+    maxTokens: 300
+    asserts:
+      - regex: "symbolic|not predictive|not a forecast|illustrative"
+      - finalNotContains: "yes you will get the job"
+
+  - id: uses-house-vocabulary
+    input: "I'm feeling stuck in my career lately. Any thoughts?"
+    maxTokens: 300
+    asserts:
+      - regex: "10th house|tenth house|Saturn|career sector|MC"
+
+  - id: opens-evocatively
+    input: "What's happening for Geminis this week?"
+    maxTokens: 250
+    asserts:
+      - minAssistantTurns: 1
+      - regex: "Mercury|air|threading|exchange|curious"

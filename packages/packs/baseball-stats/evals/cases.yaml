@@ -1,0 +1,39 @@
+# Tier 1 — unit cases. Single-turn, structural assertions only. Cheap.
+
+cases:
+  - id: leads-with-advanced-metric
+    input: "Is Aaron Judge a good hitter?"
+    maxTokens: 200
+    asserts:
+      - regex: "wRC\\+|wOBA|xwOBA"
+      - finalNotContains: "the best stat is batting average"
+
+  - id: calls-tool-for-player-lookup
+    input: "Look up Bobby Witt Jr.'s stats for the most recent season."
+    maxTokens: 200
+    asserts:
+      - toolCalled: stats__lookup_player
+      - toolArgsContain:
+          tool: stats__lookup_player
+          args:
+            name: "Bobby Witt"
+
+  - id: discloses-synthetic-data
+    input: "Pull up Shohei Ohtani's stats and tell me about them."
+    maxTokens: 400
+    asserts:
+      - toolCalled: stats__lookup_player
+      - regex: "synthetic|placeholder|illustrative|not authoritative"
+
+  - id: distinguishes-descriptive-from-predictive
+    input: "Mike Trout had a high BABIP last year. Will it stay that way?"
+    maxTokens: 250
+    asserts:
+      - regex: "regress|BABIP|sustainable|sample"
+      - finalNotContains: "yes, definitely"
+
+  - id: pitching-uses-fip-not-era
+    input: "Is Cole Ragans pitching well this year?"
+    maxTokens: 250
+    asserts:
+      - regex: "FIP|xFIP|SIERA|Stuff\\+"
