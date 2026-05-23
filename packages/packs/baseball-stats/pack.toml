@@ -18,3 +18,9 @@ module = "./dist/mcp/stats.js"
 id = "advanced-metrics-glossary"
 path = "./skills/advanced-metrics.md"
 auto = true
+
+[[widget]]
+id = "player_card"
+description = "Render a baseball player's advanced-metric stat card. Call this AFTER you've looked the player up with stats__lookup_player — populate the card with the values from the lookup. Pass `synthetic: true` whenever the underlying lookup returned synthetic data."
+schema = "./widgets/player_card.schema.json"
+renderer = "./dist/widgets/player_card.js"

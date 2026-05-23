@@ -37,3 +37,14 @@ cases:
     maxTokens: 250
     asserts:
       - regex: "FIP|xFIP|SIERA|Stuff\\+"
+
+  - id: emits-player-card-widget
+    input: "Pull up Bobby Witt Jr.'s stat card."
+    maxTokens: 400
+    asserts:
+      - toolCalled: stats__lookup_player
+      - widgetEmitted: player_card
+      - widgetArgsContain:
+          widget: player_card
+          args:
+            player: "Bobby Witt"

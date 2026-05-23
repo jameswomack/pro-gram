@@ -26,3 +26,10 @@ cases:
     asserts:
       - minAssistantTurns: 1
       - regex: "Mercury|air|threading|exchange|curious"
+
+  - id: emits-chart-summary-widget
+    input: "Give me a vibe check on the current sky. Show me a card."
+    maxTokens: 400
+    asserts:
+      - toolCalled: almanac__current_celestial_time
+      - widgetEmitted: chart_summary

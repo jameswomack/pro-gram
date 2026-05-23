@@ -56,6 +56,30 @@ export const SkillConfigSchema = z.object({
   auto: z.boolean().default(false),
 });
 
+/**
+ * Declares a widget — a "tool" the model can call whose side effect is to
+ * render UI for the user rather than alter the world. Widgets are forwarded
+ * to the model as additional entries in the `tools` array (function shape,
+ * name = `widget__<id>`), but the runtime intercepts them instead of
+ * dispatching to MCP. The renderer is a JS module that exports
+ * `renderText(args) -> string` (used by the CLI today; a future React
+ * component export will plug into apps/web without a protocol change).
+ *
+ *   [[widget]]
+ *   id = "player_card"
+ *   description = "Render a player stat card. Call after looking up stats."
+ *   schema = "./widgets/player_card.schema.json"
+ *   renderer = "./dist/widgets/player_card.js"
+ */
+export const WidgetConfigSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  /** Path to a JSON file with the widget's args JSON Schema. */
+  schema: z.string(),
+  /** Path to a JS module default-exporting `{ renderText(args): string }`. */
+  renderer: z.string(),
+});
+
 export const PackManifestSchema = z.object({
   pack: z.object({
     name: z.string(),
@@ -67,9 +91,11 @@ export const PackManifestSchema = z.object({
   model: ModelConfigSchema,
   mcp: z.array(McpServerConfigSchema).default([]),
   skill: z.array(SkillConfigSchema).default([]),
+  widget: z.array(WidgetConfigSchema).default([]),
 });
 
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 export type SkillConfig = z.infer<typeof SkillConfigSchema>;
+export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
 export type PackManifest = z.infer<typeof PackManifestSchema>;

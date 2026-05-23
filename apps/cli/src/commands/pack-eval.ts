@@ -11,6 +11,7 @@ import {
   McpRegistry,
   readRun,
   writeRun,
+  WidgetRegistry,
   type CaseDelta,
   type CaseResult,
   type RunRecord,
@@ -195,8 +196,9 @@ export async function packEval(ctx: CommandContext): Promise<void> {
   const judge = needsJudge ? await getOrCreateJudge(judgeId, ctx) : undefined;
 
   const mcp = await McpRegistry.fromConfigs(loaded.dir, loaded.manifest.mcp);
+  const widgets = await WidgetRegistry.fromConfigs(loaded.dir, loaded.manifest.pack.name, loaded.manifest.widget);
   try {
-    const runner = new EvalRunner(loaded, mcp, packClient);
+    const runner = new EvalRunner(loaded, mcp, packClient, widgets);
     const run = await runner.run({
       tiers: parsed.tiers,
       judge,

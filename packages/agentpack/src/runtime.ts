@@ -6,6 +6,7 @@ import type {
 } from '@jameswomack/mluxe';
 import type { McpRegistry } from './mcp.js';
 import type { LoadedPack } from './pack.js';
+import { isWidgetToolName, type WidgetEmission, type WidgetRegistry } from './widgets.js';
 
 export interface PackRuntimeHooks {
   /** Called once when the system prompt is composed (e.g. to log it). */
@@ -20,6 +21,13 @@ export interface PackRuntimeHooks {
   onToolStart?: (call: { name: string; args: Record<string, unknown> }) => void;
   /** Tool call completed (or errored). */
   onToolEnd?: (info: { name: string; result: string; isError: boolean; ms: number }) => void;
+  /**
+   * The model emitted a widget. The runtime has already turned this into a
+   * synthetic tool result for the model; this hook gives the client a chance
+   * to actually render the widget (CLI as an ASCII panel, web as a React
+   * component — separate concerns).
+   */
+  onWidget?: (emission: WidgetEmission) => void;
   /** Errors surfaced to the user (network, parse, etc.). */
   onError?: (err: Error) => void;
   /**
@@ -58,6 +66,12 @@ export class PackRuntime {
     private pack: LoadedPack,
     private mcp: McpRegistry,
     private client: MluxeClient,
+    /**
+     * Optional widget registry. When present, widget tools are appended to the
+     * model's `tools` list and `widget__*` calls are intercepted (rendered +
+     * synthetic tool result) instead of dispatched to MCP.
+     */
+    private widgets?: WidgetRegistry,
   ) {}
 
   async run(hooks: PackRuntimeHooks, opts: PackRuntimeOptions = {}): Promise<void> {
@@ -72,7 +86,10 @@ export class PackRuntime {
       hooks.onMessage?.(m);
     };
 
-    const tools = this.mcp.asOpenAITools();
+    const tools = [
+      ...this.mcp.asOpenAITools(),
+      ...(this.widgets ? this.widgets.asOpenAITools() : []),
+    ];
 
     while (true) {
       const userText = await hooks.nextUserMessage();
@@ -147,13 +164,20 @@ export class PackRuntime {
           const t0 = Date.now();
           let resultText = '';
           let isError = false;
-          try {
-            const r = await this.mcp.callTool(call.function.name, args);
-            resultText = r.text;
-            isError = r.isError;
-          } catch (err) {
-            resultText = err instanceof Error ? err.message : String(err);
-            isError = true;
+          if (isWidgetToolName(call.function.name) && this.widgets?.has(call.function.name)) {
+            const { emission, toolResult, isError: widgetErr } = this.widgets.invoke(call.function.name, args);
+            hooks.onWidget?.(emission);
+            resultText = toolResult;
+            isError = widgetErr;
+          } else {
+            try {
+              const r = await this.mcp.callTool(call.function.name, args);
+              resultText = r.text;
+              isError = r.isError;
+            } catch (err) {
+              resultText = err instanceof Error ? err.message : String(err);
+              isError = true;
+            }
           }
           hooks.onToolEnd?.({ name: call.function.name, result: resultText, isError, ms: Date.now() - t0 });
           push({

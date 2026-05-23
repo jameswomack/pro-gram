@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CommandContext, LiveRegion } from '@jameswomack/clitermus';
 import { MluxeClient } from '@jameswomack/mluxe';
-import { loadPack, McpRegistry, PackRuntime } from '@jameswomack/agentpack';
+import { loadPack, McpRegistry, PackRuntime, WidgetRegistry, type WidgetEmission } from '@jameswomack/agentpack';
 import { ensureModelDownloaded } from '../lib/ensure-model.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -80,6 +80,7 @@ export async function packInfo(ctx: CommandContext): Promise<void> {
   ctx.log(`  {gray-fg}${loaded.manifest.pack.description}{/gray-fg}`);
   ctx.log(`  model: {cyan-fg}${loaded.model.id}{/cyan-fg}${loaded.model.draft ? ` (+draft ${loaded.model.draft})` : ''}  temp=${loaded.model.temperature ?? 0.7}`);
   ctx.log(`  mcp servers: ${loaded.manifest.mcp.map((m) => m.id).join(', ') || '(none)'}`);
+  ctx.log(`  widgets: ${loaded.manifest.widget.map((w) => w.id).join(', ') || '(none)'}`);
   ctx.log(`  auto skills: ${loaded.manifest.skill.filter((s) => s.auto).map((s) => s.id).join(', ') || '(none)'}`);
   ctx.log(`  on-demand skills: ${loaded.ondemandSkills.map((s) => s.id).join(', ') || '(none)'}`);
   ctx.log('');
@@ -89,13 +90,27 @@ export async function packInfo(ctx: CommandContext): Promise<void> {
   if (lines.length > 30) ctx.log('{gray-fg}  (… truncated){/gray-fg}');
 }
 
-let cached: { name: string; modelId: string; client: MluxeClient; mcp: McpRegistry } | null = null;
+let cached: { name: string; modelId: string; client: MluxeClient; mcp: McpRegistry; widgets: WidgetRegistry } | null = null;
 
 export function shutdownPackClients(): void {
   if (!cached) return;
   void cached.client.stopServer();
   void cached.mcp.close();
   cached = null;
+}
+
+/**
+ * Wrap text in a Unicode-box panel for the activity log. Each line in the
+ * widget renderer's output becomes one row in the box. Border width matches
+ * the longest line (capped at 76 chars).
+ */
+function renderWidgetPanel(title: string, body: string): string[] {
+  const lines = body.split('\n');
+  const width = Math.min(76, Math.max(title.length + 4, ...lines.map((l) => l.length))) + 2;
+  const top = '┌─ ' + title + ' ' + '─'.repeat(Math.max(0, width - title.length - 4)) + '┐';
+  const bot = '└' + '─'.repeat(width) + '┘';
+  const padded = lines.map((l) => '│ ' + l + ' '.repeat(Math.max(0, width - l.length - 2)) + ' │');
+  return [top, ...padded, bot];
 }
 
 export async function packRun(ctx: CommandContext): Promise<void> {
@@ -149,19 +164,22 @@ export async function packRun(ctx: CommandContext): Promise<void> {
     }
     ctx.log(`{green-fg}✓ server ready at ${client.baseUrl}{/green-fg}`);
 
-    ctx.log('{gray-fg}Loading MCP servers…{/gray-fg}');
+    ctx.log('{gray-fg}Loading MCP servers + widgets…{/gray-fg}');
     const mcp = await McpRegistry.fromConfigs(loaded.dir, loaded.manifest.mcp);
-    cached = { name: loaded.manifest.pack.name, modelId, client, mcp };
+    const widgets = await WidgetRegistry.fromConfigs(loaded.dir, loaded.manifest.pack.name, loaded.manifest.widget);
+    cached = { name: loaded.manifest.pack.name, modelId, client, mcp, widgets };
   }
 
-  const { client, mcp } = cached;
-  const runtime = new PackRuntime(loaded, mcp, client);
+  const { client, mcp, widgets } = cached;
+  const runtime = new PackRuntime(loaded, mcp, client, widgets);
 
   ctx.log('');
   ctx.log(`{bold}─── chat with pack "${loaded.manifest.pack.name}" ───{/bold}`);
   ctx.log(`{gray-fg}${loaded.manifest.pack.description}{/gray-fg}`);
   const toolNames = mcp.listTools().map((t) => t.qualifiedName);
   if (toolNames.length > 0) ctx.log(`{gray-fg}tools: ${toolNames.join(', ')}{/gray-fg}`);
+  const widgetNames = widgets.list().map((w) => w.toolName);
+  if (widgetNames.length > 0) ctx.log(`{gray-fg}widgets: ${widgetNames.join(', ')}{/gray-fg}`);
   ctx.log('{gray-fg}Escape or /exit leaves the chat.{/gray-fg}');
   ctx.log('');
 
@@ -201,6 +219,11 @@ export async function packRun(ctx: CommandContext): Promise<void> {
       const color = isError ? 'red-fg' : 'gray-fg';
       const head = truncate(result.replace(/\s+/g, ' '), 160);
       ctx.log(`  {${color}}↩ ${head}{/${color}}  {gray-fg}(${ms} ms){/gray-fg}`);
+    },
+    onWidget: (w: WidgetEmission) => {
+      endRegion();
+      const panel = renderWidgetPanel(`widget · ${w.id}`, w.text);
+      for (const line of panel) ctx.log(`{cyan-fg}${line}{/cyan-fg}`);
     },
     onError: (err) => {
       endRegion();

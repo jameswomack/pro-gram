@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "player": { "type": "string", "description": "Full player name." },
+    "season": { "type": "integer", "description": "Season year. Defaults to the most recent." },
+    "wOBA":    { "type": "number", "description": "Weighted on-base average." },
+    "xwOBA":   { "type": "number", "description": "Expected wOBA from Statcast." },
+    "wRCplus": { "type": "number", "description": "wRC+, league average = 100." },
+    "barrelRatePct": { "type": "number", "description": "Barrel/PA percentage." },
+    "synthetic": { "type": "boolean", "description": "Flag this card as synthetic / illustrative." }
+  },
+  "required": ["player"]
+}

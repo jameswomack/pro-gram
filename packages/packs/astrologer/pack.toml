@@ -17,3 +17,9 @@ module = "./dist/mcp/almanac.js"
 id = "zodiac-primer"
 path = "./skills/zodiac.md"
 auto = true
+
+[[widget]]
+id = "chart_summary"
+description = "Render a quick celestial snapshot card. Use it when the user asks for a vibe-check / current sky / their natal chart shorthand. Fill in whichever fields you actually have grounding for; if you used the almanac tool, mark the card synthetic so the user knows the data isn't from a real ephemeris."
+schema = "./widgets/chart_summary.schema.json"
+renderer = "./dist/widgets/chart_summary.js"

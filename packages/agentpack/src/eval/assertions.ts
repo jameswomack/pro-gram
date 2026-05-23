@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@jameswomack/mluxe';
 import type { Assertion } from './schema.js';
+import { WIDGET_TOOL_PREFIX } from '../widgets.js';
 
 export interface AssertionResult {
   pass: boolean;
@@ -16,6 +17,8 @@ export function evaluateAssertion(assertion: Assertion, trajectory: ChatMessage[
   const allAssistantText = assistantMessages.map((m) => m.content ?? '').join('\n');
   const finalAssistantText = assistantMessages[assistantMessages.length - 1]?.content ?? '';
   const toolCalls = assistantMessages.flatMap((m) => m.tool_calls ?? []);
+  const widgetCalls = toolCalls.filter((c) => c.function.name.startsWith(WIDGET_TOOL_PREFIX));
+  const widgetIds = new Set(widgetCalls.map((c) => c.function.name.slice(WIDGET_TOOL_PREFIX.length)));
 
   if ('contains' in assertion) {
     return mk(allAssistantText.toLowerCase().includes(assertion.contains.toLowerCase()), `contains "${assertion.contains}"`);
@@ -58,6 +61,22 @@ export function evaluateAssertion(assertion: Assertion, trajectory: ChatMessage[
       return isSubsetMatch(parsed, want.args);
     });
     return mk(ok, `toolArgsContain ${want.tool} ⊇ ${JSON.stringify(want.args)}`);
+  }
+  if ('widgetEmitted' in assertion) {
+    return mk(widgetIds.has(assertion.widgetEmitted), `widgetEmitted ${assertion.widgetEmitted}`);
+  }
+  if ('widgetNotEmitted' in assertion) {
+    return mk(!widgetIds.has(assertion.widgetNotEmitted), `widgetNotEmitted ${assertion.widgetNotEmitted}`);
+  }
+  if ('widgetArgsContain' in assertion) {
+    const want = assertion.widgetArgsContain;
+    const ok = widgetCalls.some((c) => {
+      if (c.function.name.slice(WIDGET_TOOL_PREFIX.length) !== want.widget) return false;
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(c.function.arguments) as Record<string, unknown>; } catch { return false; }
+      return isSubsetMatch(parsed, want.args);
+    });
+    return mk(ok, `widgetArgsContain ${want.widget} ⊇ ${JSON.stringify(want.args)}`);
   }
   if ('minAssistantTurns' in assertion) {
     return mk(assistantMessages.length >= assertion.minAssistantTurns, `minAssistantTurns ${assertion.minAssistantTurns}`);
