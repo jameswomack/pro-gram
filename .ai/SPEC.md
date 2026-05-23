@@ -61,7 +61,7 @@ pro-gram/
 | F-005 | AI context system (.ai/) | `[SHIPPED]` | `.ai/` | SPEC.md, skills, tool-configs, multi-agent symlinks |
 | F-006 | Monorepo infrastructure | `[SHIPPED]` | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json` | pnpm workspaces, shared TS config, Prettier, EditorConfig |
 | F-007 | CLI+TUI primitives package (clitermus) | `[SHIPPED]` | `packages/clitermus/src/` | `levenshtein` / `damerauLevenshtein` / `CommandPalette` / `History` / `createTui`. Blessed-backed TUI with ghost-text autocomplete, prefix-filtered history, did-you-mean. 16 unit tests. Will publish as `@jameswomack/clitermus`. |
-| F-008 | mluxe + /ml chat perf knobs | `[SHIPPED]` | `packages/mluxe/src/client.ts`, `apps/cli/src/commands/ml.ts` | Prompt cache (`--prompt-cache-size/bytes`), speculative decoding (`--draft-model/num-draft-tokens`), optional warm-up shot post-startServer, live-stream tokens to the activity bar with ttft/total timing per turn, model-alias shortcuts (`qwen-14b`/`-7b`/`-3b`/`-1.5b`/`-0.5b`). |
+| F-008 | mluxe + /ml chat perf knobs | `[SHIPPED]` | `packages/mluxe/src/client.ts`, `apps/cli/src/commands/ml.ts`, [`packages/mluxe/docs/speculative-decoding.md`](../packages/mluxe/docs/speculative-decoding.md) | Prompt cache (`--prompt-cache-size/bytes`), speculative decoding (`--draft-model/num-draft-tokens`), optional warm-up shot post-startServer, live-stream tokens to the activity bar with ttft/total timing per turn, model-alias shortcuts (`qwen-14b`/`-7b`/`-3b`/`-1.5b`/`-0.5b`). |
 
 ### 2.2 Planned
 

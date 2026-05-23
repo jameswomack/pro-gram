@@ -6,6 +6,10 @@ Apple MLX wrapper for local LLM inference on Apple Silicon, callable from Node.j
 
 mluxe bridges Node.js and Apple's [MLX](https://github.com/ml-explore/mlx) framework, enabling local LLM inference that takes full advantage of Apple Silicon's unified memory architecture and Metal GPU acceleration.
 
+> Looking for the technique behind `draftModel` / `--draft=…`? See
+> [`docs/speculative-decoding.md`](docs/speculative-decoding.md) for the full
+> walkthrough.
+
 ## Architecture
 
 ```text
