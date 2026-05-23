@@ -18,8 +18,26 @@ export interface CommandContext {
    * Blessed tags allowed.
    */
   progress: (content: string | null) => void;
+  /**
+   * Open a "live region" in the log pane for streaming content (e.g. LLM
+   * tokens). Each call to `write` replaces the region's content in place —
+   * lines grow naturally, blessed handles wrapping, and the user reads it
+   * the same way they read static log output. Call `finalize` when the
+   * stream is complete so the region stops accepting writes.
+   *
+   * Caveat: while a stream is open, avoid `ctx.log()` from another source —
+   * it interleaves and breaks the region's contiguous block of lines.
+   */
+  streamLines: () => LiveRegion;
   /** Manually re-render. Usually not needed — log() renders for you. */
   render: () => void;
+}
+
+export interface LiveRegion {
+  /** Replace the region's content with `text` (may contain newlines). */
+  write: (text: string) => void;
+  /** Lock the region — further `write()` calls become no-ops. */
+  finalize: () => void;
 }
 
 export interface Command extends CommandSpec {
@@ -182,6 +200,58 @@ export function createTui(opts: TuiOptions): TuiHandle {
     log.pushLine(line);
     (log as unknown as { setScrollPerc(n: number): void }).setScrollPerc(100);
     screen.render();
+  }
+
+  /**
+   * Open a streaming "live region" in the log. Returns `{write, finalize}`.
+   *
+   * Implementation: blessed.box keeps its content as an array of lines. We
+   * track the index of our region's first line, plus how many lines we own.
+   * On each `write(text)`:
+   *   - Split `text` by `\n` into target lines.
+   *   - For each target line, either `setLine(idx+i, line)` if we already own
+   *     that slot, or `pushLine(line)` if extending.
+   *   - If we owned more lines previously than now (unusual), leave the tail
+   *     as-is (the model output never shrinks, so this rarely matters).
+   * blessed handles soft-wrapping of long lines automatically.
+   */
+  function streamLines(): LiveRegion {
+    const logAny = log as unknown as {
+      getLines(): string[];
+      pushLine(s: string): void;
+      setLine(i: number, s: string): void;
+      setScrollPerc(n: number): void;
+    };
+    let firstIdx = -1;
+    let ownedCount = 0;
+    let done = false;
+
+    return {
+      write(text: string): void {
+        if (done) return;
+        const targetLines = text.split('\n');
+        if (firstIdx === -1) {
+          firstIdx = logAny.getLines().length;
+          for (const ln of targetLines) logAny.pushLine(ln);
+          ownedCount = targetLines.length;
+        } else {
+          for (let i = 0; i < targetLines.length; i++) {
+            const ln = targetLines[i]!;
+            if (i < ownedCount) {
+              logAny.setLine(firstIdx + i, ln);
+            } else {
+              logAny.pushLine(ln);
+              ownedCount++;
+            }
+          }
+        }
+        logAny.setScrollPerc(100);
+        screen.render();
+      },
+      finalize(): void {
+        done = true;
+      },
+    };
   }
 
   function setStatus(id: string, content: string): void {
@@ -400,6 +470,7 @@ export function createTui(opts: TuiOptions): TuiHandle {
       log: logLine,
       prompt: subPrompt,
       progress,
+      streamLines,
       render: () => screen.render(),
     };
     try {

@@ -6,6 +6,7 @@ export {
   parseArgs,
   type Command,
   type CommandContext,
+  type LiveRegion,
   type StatusItem,
   type TuiHandle,
   type TuiOptions,
