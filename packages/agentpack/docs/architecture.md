@@ -31,20 +31,39 @@ npm-style resolver.
   - `baseball-stats` — sabermetrics expert; synthetic `lookup_player` tool.
   - `astrologer` — whimsical chart-reader; coarse `current_celestial_time` tool.
 
-## Phase 2 — Evals (planned)
+## Phase 2 — Evals (shipped)
 
-Three tiers, run in order, budget-gated:
+Three tiers, run in order, budget-gated. Full file-format reference lives at
+[`eval-schema.md`](eval-schema.md).
 
-1. **Unit cases** — YAML `input → expected substring/regex/JSON shape`. Cheap;
-   for tool-call shape, format compliance.
-2. **Property checks** — LLM-as-judge with chain-of-thought rubric (G-Eval
-   style). Cheap judge first (Qwen-3B), main judge only on borderline cases.
-3. **Task evals** — end-to-end task with multi-step rubric. Most expensive,
-   most predictive of real quality.
+1. **Unit cases** (`cases.yaml`) — single-turn input → structural assertions
+   (`contains`, `regex`, `toolCalled`, `toolArgsContain`, etc.). No judge. The
+   PR-loop tier.
+2. **Property checks** (`properties.yaml`) — LLM-as-judge (G-Eval style: CoT
+   *then* score, leniently parsed `{score, reasoning, passes, fails}`). Cheap
+   judge by default (`qwen-3b`); swap via `--judge-model=qwen-14b` for
+   borderline cases.
+3. **Task evals** (`tasks.yaml`) — multi-turn scripted conversation; judge
+   scores the full trajectory against a rubric. Most expensive, most
+   predictive.
 
-Results stored as JSONL in `packages/packs/<name>/.eval-runs/`. `/pack eval
-<name> [--tier=N] [--diff]` runs the suite and diffs against the most recent
-run. Trajectories (full message + tool trace) recorded for replay.
+Results land as JSONL in `<pack>/.eval-runs/<iso-timestamp>.jsonl` — one
+header line plus one record per case. **Trajectories are persisted in full**
+(every message including `role:'tool'` results), so a future trajectory-diff
+tool can fork a recorded run against an edited pack and surface exact
+divergence points.
+
+`/pack eval <name> [--tier=1|2|3|all] [--diff] [--judge-model=qwen-3b]`:
+- runs the suite,
+- streams progress + per-case pass/fail with failed-assertion reasons,
+- writes the JSONL,
+- with `--diff`, compares the new run to the most recent prior and shows tier
+  summaries (`prevMean → currMean ↑/↓`) plus improved/regressed/new/removed
+  cases.
+
+A pack model client (with the pack's preferred model + draft) and a judge
+client (separate model, pinned to port 8090 so both stay up) are cached
+across `/pack eval` invocations in a session. Shutdown hook closes both.
 
 ## Phase 3 — Widgets (planned)
 

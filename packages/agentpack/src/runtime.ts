@@ -23,6 +23,12 @@ export interface PackRuntimeHooks {
   /** Errors surfaced to the user (network, parse, etc.). */
   onError?: (err: Error) => void;
   /**
+   * Fires every time a message is pushed onto the conversation — user,
+   * assistant, or tool. The eval runner uses this to record full trajectories
+   * without owning the message array.
+   */
+  onMessage?: (msg: ChatMessage) => void;
+  /**
    * Source of the next user turn. Resolve `null` to end the chat. The runtime
    * calls this between turns.
    */
@@ -58,6 +64,13 @@ export class PackRuntime {
     const maxHops = opts.maxToolHops ?? 4;
     const messages: ChatMessage[] = [{ role: 'system', content: this.pack.systemPrompt }];
     hooks.onSystemPrompt?.(this.pack.systemPrompt);
+    hooks.onMessage?.(messages[0]!);
+
+    /** Push to messages and fire onMessage in one place so trajectory recording stays in sync. */
+    const push = (m: ChatMessage): void => {
+      messages.push(m);
+      hooks.onMessage?.(m);
+    };
 
     const tools = this.mcp.asOpenAITools();
 
@@ -67,7 +80,7 @@ export class PackRuntime {
       const trimmed = userText.trim();
       if (!trimmed) continue;
 
-      messages.push({ role: 'user', content: trimmed });
+      push({ role: 'user', content: trimmed });
       hooks.onUserMessage?.(trimmed);
 
       for (let hop = 0; hop < maxHops; hop++) {
@@ -110,7 +123,7 @@ export class PackRuntime {
           }));
 
         // Record this assistant turn.
-        messages.push({
+        push({
           role: 'assistant',
           content: assistantText,
           ...(finalizedCalls.length > 0 ? { tool_calls: finalizedCalls } : {}),
@@ -143,7 +156,7 @@ export class PackRuntime {
             isError = true;
           }
           hooks.onToolEnd?.({ name: call.function.name, result: resultText, isError, ms: Date.now() - t0 });
-          messages.push({
+          push({
             role: 'tool',
             tool_call_id: call.id,
             name: call.function.name,

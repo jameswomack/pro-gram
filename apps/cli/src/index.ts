@@ -5,6 +5,7 @@ import { mlExec, mlChat, shutdownMlClients } from './commands/ml.js';
 import { healthApi, healthWeb, healthAll } from './commands/health.js';
 import { specStatus } from './commands/spec.js';
 import { packList, packInfo, packRun, shutdownPackClients } from './commands/pack.js';
+import { packEval, shutdownPackEvalClients } from './commands/pack-eval.js';
 
 const tui = createTui({
   title: 'pro-gram CLI',
@@ -21,6 +22,7 @@ const tui = createTui({
     { name: 'pack list', description: 'List available agent packs.', handler: packList },
     { name: 'pack info', description: 'Show a pack\'s manifest, tools, skills, and composed system prompt. Usage: /pack info <name>', handler: packInfo },
     { name: 'pack run', description: 'Enter an interactive chat with the given pack loaded. Usage: /pack run <name>', handler: packRun },
+    { name: 'pack eval', description: 'Run a pack\'s eval suite. Usage: /pack eval <name> [--tier=1|2|3|all] [--diff] [--judge-model=qwen-3b]', handler: packEval },
     { name: 'ml exec', description: 'Run a one-shot prompt via mluxe (CLI mode). Usage: /ml exec "your prompt"', handler: mlExec },
     { name: 'ml chat', description: 'Enter an interactive multi-turn chat. Escape or /exit to leave. Usage: /ml chat [opening prompt]', handler: mlChat },
     { name: 'health api', description: 'Check the Fastify API health endpoint.', handler: healthApi },
@@ -31,8 +33,9 @@ const tui = createTui({
 });
 
 // Best-effort cleanup of cached children when this process exits.
-process.on('exit', () => { shutdownMlClients(); shutdownPackClients(); });
-process.on('SIGINT', () => { shutdownMlClients(); shutdownPackClients(); });
-process.on('SIGTERM', () => { shutdownMlClients(); shutdownPackClients(); });
+const cleanup = (): void => { shutdownMlClients(); shutdownPackClients(); shutdownPackEvalClients(); };
+process.on('exit', cleanup);
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 tui.start();
