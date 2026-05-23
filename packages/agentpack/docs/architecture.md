@@ -19,6 +19,70 @@ Today the resolver in `apps/cli` looks bases up by simple directory name under
 `packages/packs/`; if we need cross-repo packs later this can be swapped for an
 npm-style resolver.
 
+## Lifecycle: source → artifact → runtime → state
+
+Everything in agentpack moves through four stages. Naming them explicitly keeps
+the responsibilities of each module clear and tells future features (Phase 4
+differential evals, trajectory diffing, model-swap divergence) where to plug in.
+
+**1. Source** — human-edited input contracts under each pack directory:
+
+- `pack.toml` — manifest (prompts, MCP servers, model, skills index)
+- `skills/*.md` — skill bodies (auto-prepended or on-demand)
+- `evals/{cases,properties,tasks}.yaml` — the three eval tiers
+
+Source files are the only things checked into git for a pack. Everything below
+is derived.
+
+**2. Runtime** — composed in-memory state, built fresh per session:
+
+- `loadPack(dir)` → `LoadedPack` (resolved `extends` tree, composed system
+  prompt, partitioned skills, normalized model config) — `src/pack.ts`
+- `McpRegistry` → live MCP clients + tool schemas in OpenAI shape —
+  `src/mcp.ts`
+- `PackRuntime` → the chat/tool loop with `onAssistantDelta` /
+  `onToolStart` / `onToolEnd` hooks — `src/runtime.ts`
+- `EvalRunner` → orchestrates tiered runs on top of `PackRuntime`,
+  scripted-dispatch for unit/task, judge-call for property/task —
+  `src/eval/runner.ts`
+
+Runtime objects are ephemeral. The interesting outputs are the artifacts.
+
+**3. Artifact** — durable, replayable records of a runtime execution:
+
+- `<pack>/.eval-runs/<iso-timestamp>.jsonl` — one header line + one
+  `CaseResult` per case. **Trajectories are persisted in full** (every
+  assistant token, tool call, and `role:'tool'` result), which is what makes
+  them load-bearing for downstream features:
+  - Phase 4 trajectory-diff forks an artifact against an edited pack
+  - Model-swap divergence replays an artifact under a different model
+  - Adversarial generation seeds from artifact failure modes
+
+The artifact format is the *contract* between Phase 2 (today) and Phase 4. If
+you change `CaseResult`'s shape, you break replay.
+
+**4. State** — aggregated views computed across artifacts:
+
+- `diffRuns(prev, curr)` → improved / regressed / unchanged / new / removed
+  buckets and per-tier mean deltas — `src/eval/diff.ts`
+- `/pack eval --diff` is the only consumer today; Phase 4 differential evals
+  and a future dashboard will read the same artifacts to compute different
+  state views.
+
+State is cheap to recompute and never stored — artifacts are the truth.
+
+### Why this matters
+
+The four-stage frame answers questions that come up when adding features:
+
+- *"Where does the new field go?"* — input → source; intermediate → runtime;
+  must replay later → artifact; aggregated view → state.
+- *"What breaks if I change this?"* — source/artifact shape changes are
+  contract-breaking; runtime/state changes are not.
+- *"Can I cache this?"* — runtime objects, yes (we cache pack + judge model
+  clients across `/pack eval` calls); artifacts, never overwrite (they're
+  append-only by timestamp).
+
 ## Phase 1 (shipping)
 
 - `loadPack(dir)` — manifest parsing, prompt composition, skill split.
