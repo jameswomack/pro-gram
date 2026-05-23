@@ -83,6 +83,17 @@ The four-stage frame answers questions that come up when adding features:
   clients across `/pack eval` calls); artifacts, never overwrite (they're
   append-only by timestamp).
 
+### Formal contracts
+
+The eval runner's coordination invariants — tier ordering, sequential case
+execution, atomic + complete artifact write, eventual termination — are
+modeled in TLA+ at [`../tla/EvalRunner.tla`](../tla/EvalRunner.tla). The
+spec exists as a **design artifact for Phase 4**: differential evals and
+trajectory diffing both depend on "an artifact is either absent or
+complete," and on tiers staying in fixed order. See
+[`../tla/README.md`](../tla/README.md) for how to run TLC and when to
+update a spec.
+
 ## Phase 1 (shipping)
 
 - `loadPack(dir)` — manifest parsing, prompt composition, skill split.
