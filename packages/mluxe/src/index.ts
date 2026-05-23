@@ -8,5 +8,8 @@ export type {
   GenerationOptions,
   ModelInfo,
   MluxeConfig,
+  ToolCall,
+  ToolCallDelta,
+  ToolDefinition,
   Usage,
 } from './types.js';

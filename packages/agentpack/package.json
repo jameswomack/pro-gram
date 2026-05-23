@@ -1,0 +1,42 @@
+{
+  "name": "@jameswomack/agentpack",
+  "version": "0.1.0-alpha.0",
+  "description": "Runtime for agent packs — composable bundles of system prompt + skills + MCP tools, loaded into mluxe chats.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": ["agent", "llm", "mcp", "mlx", "tools", "skills"],
+  "author": "James Womack",
+  "license": "MIT",
+  "dependencies": {
+    "@jameswomack/mluxe": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@iarna/toml": "^2.2.5",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=24.16.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

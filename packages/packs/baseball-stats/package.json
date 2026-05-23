@@ -1,0 +1,23 @@
+{
+  "name": "@jameswomack/mluxe-pack-baseball-stats",
+  "version": "0.1.0-alpha.0",
+  "description": "Sabermetrics-literate baseball stats agent pack.",
+  "type": "module",
+  "main": "dist/mcp/stats.js",
+  "files": ["dist", "skills", "pack.toml", "system-prompt.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=24.16.0"
+  }
+}
