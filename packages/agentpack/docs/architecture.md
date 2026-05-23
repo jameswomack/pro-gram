@@ -203,8 +203,11 @@ These are not in OpenAI Evals, DSPy, Inspect, or LangSmith today:
 - Sandboxing of stdio MCP servers. Today they run with the same permissions as
   the CLI. Fine for trusted local development; a `--sandbox` flag is the right
   follow-up before we accept third-party packs.
-- A widget renderer (Phase 3).
-- An eval runner (Phase 2).
+- Web rendering for widgets. Phase 3 shipped the CLI Unicode-box renderer and
+  the `WidgetRegistry` contract; the web side is an additive `Component`
+  export per renderer module, planned but not built.
+- Phase 4 (differential evals, trajectory diffing, model-swap divergence,
+  adversarial generation) — design pinned by [`../tla/EvalRunner.tla`](../tla/EvalRunner.tla).
 
 ## References
 
