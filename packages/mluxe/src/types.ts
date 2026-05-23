@@ -36,8 +36,37 @@ export interface MluxeConfig {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  /** Present when the assistant emitted tool calls. */
+  tool_calls?: ToolCall[];
+  /** Required when role === 'tool': the id of the call this is responding to. */
+  tool_call_id?: string;
+  /** Optional name (tool messages) — some servers want it. */
+  name?: string;
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    /** JSON-encoded arguments. */
+    arguments: string;
+  };
+}
+
+/**
+ * OpenAI function-tool definition. The exact shape `mlx_lm.server` expects in
+ * its chat completions endpoint when `tools: [...]` is provided.
+ */
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
 export interface GenerationOptions {
@@ -45,6 +74,10 @@ export interface GenerationOptions {
   top_p?: number;
   max_tokens?: number;
   stop?: string[];
+  /** Tools available for this turn. Forwarded as OpenAI `tools`. */
+  tools?: ToolDefinition[];
+  /** Optional `tool_choice` to force a particular tool. */
+  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
 }
 
 export interface Usage {
@@ -57,13 +90,36 @@ export interface ChatResponse {
   content: string;
   model: string;
   usage?: Usage;
+  /** Present when the assistant invoked tools instead of (or alongside) replying. */
+  tool_calls?: ToolCall[];
+  finishReason?: string;
 }
 
 export interface ChatStreamChunk {
   /** Incremental content delta */
   delta: string;
+  /**
+   * Incremental tool-call delta if present. Caller is responsible for
+   * accumulating across chunks — each chunk may carry the id, the function
+   * name, or a fragment of `arguments`. Use the `index` field to associate
+   * fragments with a specific call when multiple are emitted in parallel.
+   */
+  toolCallDelta?: ToolCallDelta;
   /** True on the final chunk */
   done: boolean;
+  /** OpenAI `finish_reason` if surfaced (`stop`, `tool_calls`, `length`, etc.). */
+  finishReason?: string;
+}
+
+export interface ToolCallDelta {
+  /** Index in the assistant's tool_calls array. Required for assembly. */
+  index: number;
+  id?: string;
+  type?: 'function';
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
 }
 
 export interface ModelInfo {

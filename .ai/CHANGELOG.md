@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-05-22 (F-009 Phase 1: agent packs)
+
+- New package `@jameswomack/agentpack`: a pack is a manifest (`pack.toml`) + composed system prompt + skills + MCP servers + model config. `loadPack()` parses + composes (handles `extends` inheritance, base→leaf prompt order, auto vs. on-demand skills). `McpRegistry` owns MCP client lifetimes — in-process servers via `@modelcontextprotocol/sdk` `InMemoryTransport`, external `stdio` servers as subprocesses; exposes tools in OpenAI function-call shape. `PackRuntime` drives the chat tool-loop with hooks for live streaming + tool-call rendering. 5 unit tests.
+- mluxe: extended `chatStream()` with `tools` / `tool_choice` and `toolCallDelta` chunks; `chat()` and `ChatResponse` surface `tool_calls` and `finishReason`. New `ToolCall` / `ToolCallDelta` / `ToolDefinition` types exported.
+- Two example packs under `packages/packs/`:
+  - `baseball-stats` — sabermetrics expert with a synthetic `lookup_player` MCP tool and an advanced-metrics glossary skill.
+  - `astrologer` — whimsical chart-reader with a `current_celestial_time` MCP tool and a zodiac/houses primer.
+- apps/cli: `/pack list`, `/pack info <name>`, `/pack run <name>` (multi-turn chat with the pack loaded; renders tool calls inline; same `LiveRegion` streaming as `/ml chat`). Shutdown hook closes MCP clients alongside the cached mlx server.
+- pnpm workspace extended with `packages/packs/*`.
+- Docs: `packages/agentpack/README.md`, `packages/agentpack/docs/architecture.md` (covers Phase 1 + the eval / widget / diff-eval roadmap and cites DSPy, G-Eval, MCP, Voyager).
+
 ### 2026-05-22 (stream render fix)
 
 - clitermus: new `ctx.streamLines()` → `LiveRegion { write, finalize }`. Opens a "live region" in the log pane backed by `box.setLine()` / `box.pushLine()` so streaming content grows lines naturally (blessed handles soft-wrap) instead of being crammed into the one-row activity bar. Static log content above and below is untouched.

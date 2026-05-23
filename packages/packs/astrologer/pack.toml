@@ -1,0 +1,19 @@
+[pack]
+name = "astrologer"
+description = "Whimsical, well-read astrologer. Reads charts with theatrical flair but keeps the mechanics honest."
+version = "0.1.0"
+systemPrompt = "./system-prompt.md"
+
+[model]
+id = "qwen-14b"
+temperature = 0.9
+
+[[mcp]]
+id = "almanac"
+kind = "in-process"
+module = "./dist/mcp/almanac.js"
+
+[[skill]]
+id = "zodiac-primer"
+path = "./skills/zodiac.md"
+auto = true

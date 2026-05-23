@@ -43,8 +43,16 @@ async function isPortAvailable(port: number, host: string): Promise<boolean> {
 }
 
 interface OpenAIChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
+  message?: { content?: string; tool_calls?: import('./types.js').ToolCall[] };
+  delta?: {
+    content?: string;
+    tool_calls?: Array<{
+      index: number;
+      id?: string;
+      type?: 'function';
+      function?: { name?: string; arguments?: string };
+    }>;
+  };
   finish_reason?: string | null;
 }
 
@@ -259,6 +267,8 @@ export class MluxeClient {
       content: data.choices[0]?.message?.content ?? '',
       model: data.model,
       usage: data.usage,
+      tool_calls: data.choices[0]?.message?.tool_calls,
+      finishReason: data.choices[0]?.finish_reason ?? undefined,
     };
   }
 
@@ -303,8 +313,26 @@ export class MluxeClient {
         }
         try {
           const chunk = JSON.parse(payload) as OpenAIResponse;
-          const delta = chunk.choices[0]?.delta?.content ?? '';
-          if (delta) yield { delta, done: false };
+          const choice = chunk.choices[0];
+          const delta = choice?.delta?.content ?? '';
+          const finishReason = choice?.finish_reason ?? undefined;
+          const toolDeltas = choice?.delta?.tool_calls ?? [];
+          if (toolDeltas.length > 0) {
+            for (const td of toolDeltas) {
+              yield {
+                delta: '',
+                toolCallDelta: {
+                  index: td.index,
+                  id: td.id,
+                  type: td.type,
+                  function: td.function,
+                },
+                done: false,
+                finishReason,
+              };
+            }
+          }
+          if (delta) yield { delta, done: false, finishReason };
         } catch {
           // Skip malformed lines
         }
@@ -339,6 +367,8 @@ export class MluxeClient {
       top_p: o?.top_p ?? 1.0,
       max_tokens: o?.max_tokens ?? 2048,
       ...(o?.stop ? { stop: o.stop } : {}),
+      ...(o?.tools && o.tools.length > 0 ? { tools: o.tools } : {}),
+      ...(o?.tool_choice !== undefined ? { tool_choice: o.tool_choice } : {}),
     };
   }
 

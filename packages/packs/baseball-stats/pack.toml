@@ -1,0 +1,20 @@
+[pack]
+name = "baseball-stats"
+description = "Sabermetrics-literate baseball stats expert. Answers from advanced metrics (wOBA, xwOBA, FIP, framing runs, etc.)."
+version = "0.1.0"
+systemPrompt = "./system-prompt.md"
+
+[model]
+id = "qwen-14b"
+draft = "qwen-0.5b"
+temperature = 0.3
+
+[[mcp]]
+id = "stats"
+kind = "in-process"
+module = "./dist/mcp/stats.js"
+
+[[skill]]
+id = "advanced-metrics-glossary"
+path = "./skills/advanced-metrics.md"
+auto = true
