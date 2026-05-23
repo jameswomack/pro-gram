@@ -42,7 +42,7 @@ Performance tips (default config already turns these on where free):
 
 - **Prompt cache** is on by default (4 slots). Multi-turn chats see ~2–5× lower latency on turn 2+.
 - **Warm-up shot** is on by default. Costs a few seconds at startup; eliminates compile latency on the user's first real turn.
-- **Speculative decoding** is opt-in. `--draft=qwen-0.5b` with the 14B main usually nets ~1.5–2× throughput at no quality cost.
+- **Speculative decoding** is opt-in. `--draft=qwen-0.5b` with the 14B main usually nets ~1.5–2× throughput at no quality cost. ([deep dive](../../packages/mluxe/docs/speculative-decoding.md))
 - **Smaller model**: `--model=qwen-7b` is the easiest big lever.
 
 Environment overrides: `MLUXE_MODEL`, `MLUXE_DRAFT_MODEL`, `MLUXE_PYTHON`.
